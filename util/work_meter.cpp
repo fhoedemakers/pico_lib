@@ -11,7 +11,7 @@
 
 namespace util
 {
-
+#if 0
     namespace
     {
         struct Manager
@@ -95,4 +95,5 @@ namespace util
     {
         return (manager_.startCounter_ - systick_hw->cvr) & 0xffffff;
     }
+#endif
 }
