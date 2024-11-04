@@ -6,7 +6,7 @@
 #define D49253E1_C134_64DA_1148_8904E12518DB
 
 #include <stdint.h>
-//#include <functional>
+// #include <functional>
 
 namespace util
 {
@@ -22,6 +22,15 @@ namespace util
     uint32_t _workMeterGetCounter();
 
 #ifndef NDEBUG
+#define SETWORKMETER
+#endif
+// Disable work meter in RISC-V, because it crashes the program. 
+#ifdef __riscv
+#ifdef SETWORKMETER
+#undef SETWORKMETER
+#endif
+#endif
+#ifdef SETWORKMETER
     inline void WorkMeterReset()
     {
         _workMeterReset();
