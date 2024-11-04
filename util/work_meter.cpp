@@ -9,6 +9,7 @@
 #include <pico.h>
 #include <hardware/divider.h>
 
+#ifdef SETWORKMETER
 namespace util
 {
 
@@ -96,3 +97,5 @@ namespace util
         return (manager_.startCounter_ - systick_hw->cvr) & 0xffffff;
     }
 }
+#endif
+
