@@ -16,8 +16,19 @@ extern "C"
     void tmds_encode_loop_16bpp(const uint32_t *pixbuf, uint32_t *symbuf, size_t n_pix);
     void tmds_encode_loop_16bpp_leftshift(const uint32_t *pixbuf, uint32_t *symbuf, size_t n_pix, uint32_t leftshift);
     void tmds_encode_loop_12bpp_scale16_7(const uint32_t *pixbuf, uint32_t *symbuf, size_t n_pix, uint32_t leftshift);
+    
+#if PICO_RP2350
+    #ifdef __riscv
+    void tmds_encode_loop_12bpp_scale16_7(const uint32_t *pixbuf, uint32_t *symbuf, size_t n_pix, uint32_t leftshift) {
+        tmds_encode_loop_16bpp_leftshift(pixbuf, symbuf, n_pix, leftshift);
+    }
+    #endif
+#endif
+   
+      
 }
 
+ 
 namespace dvi
 {
     namespace
