@@ -31,7 +31,7 @@ namespace dvi
         assert(pio_);
         assert(config_);
         assert(timing_);
-
+       
         initSerialiser();
         allocateBuffers(timing);
 
@@ -296,6 +296,12 @@ namespace dvi
     void
     DVI::initSerialiser()
     {
+        // Adjust PIO for gpio pins > 32
+        // The Waveshare RP2350-PiZero is a board that is using gpio pins > 32.
+        if (config_->pinTMDS[0] > 32 || config_->pinTMDS[1] > 32 || config_->pinTMDS[2] > 32)
+        {
+            pio_set_gpio_base(pio_, 16);
+        }
         auto configurePad = [](int gpio, bool invert)
         {
             hw_write_masked(
