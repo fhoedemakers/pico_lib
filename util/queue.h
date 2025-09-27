@@ -149,6 +149,7 @@ namespace util
         }
     };
 #else
+    // The original implementation for non-RP2350 targets
     template <class T>
     class Queue
     {
