@@ -14,16 +14,38 @@
 
 namespace util
 {
-#if 1
+
+#if PICO_RP2350
+    // below a copilot assisted version of this class which prevents the DVI Driver from locking up
+    // The lockup only occurs when using a framebuffer and the GenesisPlus Emulator
+    // For RP2040, the original code is used.
+    //
+    // What changed:
+    // - Replaced std::vector push + erase pattern (which was O(n) and risked capacity misuse) with a fixed-size circular buffer (head/tail/count).
+    // - Added capacity(), empty(), and tryDeque() helpers.
+    // - enque now returns bool (fails gracefully if full instead of asserting only).
+    // - Added optional spin limits to deque(spinLimit) and waitUntilContentAvailable(spinLimit) that will panic with a diagnostic instead of looping forever.
+    // - Removed costly erase(begin()) (which could invalidate assumptions and cause subtle races if capacity reserve differed from size usage).
+    //
+    // Why this helps your random endless loop
+    //
+    // - Previous code relied on reserve() then push_back() and erase(begin()). If something elsewhere accidentally called queue_.resize() (or a reallocation occurred due to reserve mismatch during changes), the assertion path or timing could leave the consumer sleeping forever if a lost __sev() happens between empty checks.
+    // - The new ring buffer always keeps elements in-place and uses __sev() only when an actual enqueue succeeds, reducing missed wake events.
+    //
+    // Follow-up suggestions
+    //
+    // - Audit all enque() call sites: they should now check the returned bool (or you can wrap with an assert if overflow is unacceptable).
+    // - If you want a build-time safety net, define a macro to map old enque(x); usage to something that asserts the return value.
+    // - Consider instrumenting if panics occur (spinLimit argument) by supplying a non-zero spinLimit in critical dequeue sites during debugging.
     template <class T>
     class Queue
     {
         // Lock protects head_, tail_, count_, and storage_ writes.
         SpinLock spinlock_;
         std::vector<T> storage_; // fixed capacity after ctor
-        size_t head_ = 0;  // index of next element to pop
-        size_t tail_ = 0;  // index of next slot to push
-        size_t count_ = 0; // number of valid elements
+        size_t head_ = 0;        // index of next element to pop
+        size_t tail_ = 0;        // index of next slot to push
+        size_t count_ = 0;       // number of valid elements
 
     public:
         Queue(size_t n = 0)
@@ -66,7 +88,8 @@ namespace util
                     ok = true;
                 }
             }
-            if (ok) __sev();
+            if (ok)
+                __sev();
             return ok;
         }
 
@@ -74,7 +97,8 @@ namespace util
         __attribute__((always_inline)) bool tryDeque(T &out)
         {
             std::lock_guard lock(spinlock_);
-            if (!count_) return false;
+            if (!count_)
+                return false;
             out = std::move(storage_[head_]);
             head_ = (head_ + 1) % storage_.size();
             --count_;
@@ -113,7 +137,8 @@ namespace util
             {
                 {
                     std::lock_guard lock(spinlock_);
-                    if (count_) return;
+                    if (count_)
+                        return;
                 }
                 if (spinLimit && ++spins > spinLimit)
                 {
@@ -124,7 +149,7 @@ namespace util
         }
     };
 #else
-     template <class T>
+    template <class T>
     class Queue
     {
         SpinLock spinlock_;
