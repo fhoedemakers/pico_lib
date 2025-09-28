@@ -205,7 +205,9 @@ namespace dvi
             }
             if (audioSampleRing_.getReadableSize() == 0)
             {
-                pendingAudioLineCount_ = 1024; // 枯渇しているようなら 2 frame くらい待ってみる
+                // pendingAudioLineCount_ = 1024; // 枯渇しているようなら 2 frame くらい待ってみる
+                // Backoff for approximately 1 video frame instead of large static penalty
+                pendingAudioLineCount_ = timing_->vFrontPorch + timing_->vSyncWidth + timing_->vBackPorch + timing_->vActiveLines;
             }
 
             audioSamplePos_ += samplesPerLine16_;
@@ -509,7 +511,25 @@ namespace dvi
     void
     DVI::setAudioFreq(int freq, int CTS, int N)
     {
+        // Map/advise on non-standard sample rates: only 32000, 44100, 48000 are explicitly encoded
+        if (!(freq == 32000 || freq == 44100 || freq == 48000))
+        {
+            printf("[DVI] Warning: non-standard audio freq %d Hz requested. InfoFrame will advertise nearest standard.\n", freq);
+        }
         audioFreq_ = freq;
+
+        // If CTS==0, auto-compute a suitable CTS for given N,freq and current pixel clock
+        // Fs = Fpix * N / (128 * CTS)  => CTS = Fpix * N / (128 * Fs)
+        if (CTS == 0 && freq > 0 && N > 0)
+        {
+            uint64_t Fpix = timing_->getPixelClock();
+            printf("Pixel clock %llu Hz, computing CTS for %d Hz, N=%d\n", Fpix, freq, N);
+            uint64_t numerator = Fpix * static_cast<uint64_t>(N);
+            uint64_t denom = static_cast<uint64_t>(128) * static_cast<uint64_t>(freq);
+            CTS = static_cast<int>((numerator + denom / 2) / denom); // rounded
+            // For common 48k/6144 pattern, CTS should equal pixelClock/1000 if pixelClock in Hz multiple of 1k.
+        }
+
         audioClockRegeneration_.setAudioClockRegeneration(CTS, N);
         audioInfoFrame_.setAudioInfoFrame(freq);
 
@@ -522,8 +542,17 @@ namespace dvi
 
         samplesPerFrame_ = static_cast<int>(static_cast<uint64_t>(freq) * nPixPerFrame / pixelClock);
         samplesPerLine16_ = static_cast<int>(static_cast<uint64_t>(freq) * nPixPerLine * 65536 / pixelClock);
-        printf("setAudioFreq: %d Hz, CTS %d, N %d, %d samples/frame %d/65536 samples/line\n", freq, CTS, N, samplesPerFrame_,
-               samplesPerLine16_);
+     // Reconstructed Fs from CTS/N for diagnostics
+     double reconstructedFs = (double)pixelClock * (double)N / (128.0 * (double)CTS);
+     double ppmError = (reconstructedFs - freq) * 1e6 / freq;
+     printf("setAudioFreq: req %d Hz, CTS %d, N %d, recon %.3f Hz (%.1f ppm), %d samples/frame %d/65536 samples/line\n",
+         freq, CTS, N, reconstructedFs, ppmError, samplesPerFrame_, samplesPerLine16_);
+
+     // Reset internal audio packet scheduling state so a runtime switch is clean.
+     audioSamplePos_ = 0;
+     leftAudioSampleCount_ = 0;
+     pendingAudioLineCount_ = 0;
+     audioFrameCount_ = 0;
 
         enableDataIsland();
     }
