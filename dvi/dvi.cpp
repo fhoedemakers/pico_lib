@@ -292,6 +292,8 @@ namespace dvi
                 (0 << PADS_BANK0_GPIO0_DRIVE_LSB),
                 PADS_BANK0_GPIO0_DRIVE_BITS | PADS_BANK0_GPIO0_SLEWFAST_BITS | PADS_BANK0_GPIO0_IE_BITS);
             gpio_set_outover(gpio, invert ? GPIO_OVERRIDE_INVERT : GPIO_OVERRIDE_NORMAL);
+            gpio_set_slew_rate(gpio, GPIO_SLEW_RATE_FAST);
+            gpio_set_drive_strength(gpio, GPIO_DRIVE_STRENGTH_12MA);
         };
 
         auto prgOfs = pio_add_program(pio_, &dvi_serialiser_program);
