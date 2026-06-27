@@ -235,7 +235,11 @@ namespace dvi
             }
             if (due > 0)
             {
-                static const AudioSample silence[4] = {};
+                // SRAM-resident silence: a static const in flash would
+                // hardfault core1 if reached during an XIP-off window,
+                // and would also add a cold-cache flash fetch to the
+                // first frames after boot.
+                static AudioSample __not_in_flash("dvi_silence") silence[4] = {};
                 audioFrameCount_ = packet.setAudioSample(silence, due, audioFrameCount_);
                 audioSamplePos_ -= due << 16;
                 return true;

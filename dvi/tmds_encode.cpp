@@ -75,13 +75,31 @@ namespace dvi
         struct SaveInterp
         {
             interp_hw_save_t s;
-            inline SaveInterp()
+            // Inlined SDK interp_save/interp_restore bodies. Two reasons:
+            //  1. During the bootloader's UF2 flash op, XIP is briefly off
+            //     per bootrom call -- a flash fetch on core1 would hardfault.
+            //  2. At cold startup the XIP cache is empty; 6 flash calls per
+            //     scanline can push core1's encode loop slow enough that the
+            //     freeTMDSQueue starves and the IRQ stalls.
+            inline __attribute__((always_inline)) SaveInterp()
             {
-                interp_save(interp0_hw, &s);
+                s.accum[0] = interp0_hw->accum[0];
+                s.accum[1] = interp0_hw->accum[1];
+                s.base[0]  = interp0_hw->base[0];
+                s.base[1]  = interp0_hw->base[1];
+                s.base[2]  = interp0_hw->base[2];
+                s.ctrl[0]  = interp0_hw->ctrl[0];
+                s.ctrl[1]  = interp0_hw->ctrl[1];
             }
-            inline ~SaveInterp()
+            inline __attribute__((always_inline)) ~SaveInterp()
             {
-                interp_restore(interp0_hw, &s);
+                interp0_hw->accum[0] = s.accum[0];
+                interp0_hw->accum[1] = s.accum[1];
+                interp0_hw->base[0]  = s.base[0];
+                interp0_hw->base[1]  = s.base[1];
+                interp0_hw->base[2]  = s.base[2];
+                interp0_hw->ctrl[0]  = s.ctrl[0];
+                interp0_hw->ctrl[1]  = s.ctrl[1];
             }
         };
     }
