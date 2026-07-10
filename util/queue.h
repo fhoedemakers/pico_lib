@@ -8,7 +8,6 @@
 #include "spinlock.h"
 #include <hardware/sync.h>
 #include <vector>
-#include <mutex>
 #include <assert.h>
 #include <pico.h>
 
@@ -57,19 +56,19 @@ namespace util
 
         __attribute__((always_inline)) size_t size()
         {
-            std::lock_guard lock(spinlock_);
+            SpinLockGuard lock(spinlock_);
             return count_;
         }
 
         __attribute__((always_inline)) bool empty()
         {
-            std::lock_guard lock(spinlock_);
+            SpinLockGuard lock(spinlock_);
             return count_ == 0;
         }
 
         __attribute__((always_inline)) const T &peek()
         {
-            std::lock_guard lock(spinlock_);
+            SpinLockGuard lock(spinlock_);
             assert(count_ > 0);
             return storage_[head_];
         }
@@ -79,7 +78,7 @@ namespace util
         {
             bool ok = false;
             {
-                std::lock_guard lock(spinlock_);
+                SpinLockGuard lock(spinlock_);
                 if (count_ < storage_.size())
                 {
                     storage_[tail_] = std::move(v);
@@ -96,7 +95,7 @@ namespace util
         // Non-blocking attempt. Returns true and assigns out if element present.
         __attribute__((always_inline)) bool tryDeque(T &out)
         {
-            std::lock_guard lock(spinlock_);
+            SpinLockGuard lock(spinlock_);
             if (!count_)
                 return false;
             out = std::move(storage_[head_]);
@@ -112,7 +111,7 @@ namespace util
             while (true)
             {
                 {
-                    std::lock_guard lock(spinlock_);
+                    SpinLockGuard lock(spinlock_);
                     if (count_)
                     {
                         T r = std::move(storage_[head_]);
@@ -136,7 +135,7 @@ namespace util
             while (true)
             {
                 {
-                    std::lock_guard lock(spinlock_);
+                    SpinLockGuard lock(spinlock_);
                     if (count_)
                         return;
                 }
@@ -164,7 +163,7 @@ namespace util
 
         __attribute__((always_inline)) size_t size()
         {
-            std::lock_guard lock(spinlock_);
+            SpinLockGuard lock(spinlock_);
             return queue_.size();
         }
 
@@ -176,7 +175,7 @@ namespace util
         __attribute__((always_inline)) void enque(T &&v)
         {
             {
-                std::lock_guard lock(spinlock_);
+                SpinLockGuard lock(spinlock_);
                 assert(queue_.size() < queue_.capacity());
                 queue_.push_back(std::move(v));
             }
@@ -188,7 +187,7 @@ namespace util
             while (1)
             {
                 {
-                    std::lock_guard lock(spinlock_);
+                    SpinLockGuard lock(spinlock_);
                     if (!queue_.empty())
                     {
                         auto r = std::move(queue_.front());
@@ -205,7 +204,7 @@ namespace util
             while (1)
             {
                 {
-                    std::lock_guard lock(spinlock_);
+                    SpinLockGuard lock(spinlock_);
                     if (!queue_.empty())
                     {
                         return;
