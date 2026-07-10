@@ -37,6 +37,18 @@ namespace dvi
 #include "tmds_table.h"
         };
 
+        // Same register writes as the SDK's interp_config_set_mask, which is
+        // plain `static inline` (not __force_inline): -O0 builds emit it out
+        // of line in flash, and the setupInterp* callers below run per
+        // scanline on core1, which must never fetch flash code while the
+        // loader programs flash. always_inline holds at every -O level.
+        __attribute__((always_inline)) inline void interpConfigSetMask(interp_config *c, uint mask_lsb, uint mask_msb)
+        {
+            c->ctrl = (c->ctrl & ~(SIO_INTERP0_CTRL_LANE0_MASK_LSB_BITS | SIO_INTERP0_CTRL_LANE0_MASK_MSB_BITS)) |
+                      ((mask_lsb << SIO_INTERP0_CTRL_LANE0_MASK_LSB_LSB) & SIO_INTERP0_CTRL_LANE0_MASK_LSB_BITS) |
+                      ((mask_msb << SIO_INTERP0_CTRL_LANE0_MASK_MSB_LSB) & SIO_INTERP0_CTRL_LANE0_MASK_MSB_BITS);
+        }
+
         int __not_in_flash_func(setupInterp)(interp_hw_t *interp, int bpp, int shift, int bits,
                                              const uint32_t *lut, int lutSizeInBits)
         {
@@ -55,13 +67,13 @@ namespace dvi
             {
                 auto c = interp_default_config();
                 interp_config_set_shift(&c, rshift);
-                interp_config_set_mask(&c, maskLSB, maskMSB);
+                interpConfigSetMask(&c, maskLSB, maskMSB);
                 interp_set_config(interp, 0, &c);
             }
             {
                 auto c = interp_default_config();
                 interp_config_set_shift(&c, rshift + bpp);
-                interp_config_set_mask(&c, maskLSB, maskMSB);
+                interpConfigSetMask(&c, maskLSB, maskMSB);
                 interp_config_set_cross_input(&c, true);
                 interp_set_config(interp, 1, &c);
             }
@@ -176,13 +188,13 @@ namespace dvi
             {
                 auto c = interp_default_config();
                 interp_config_set_shift(&c, crossInput ? bits : bits + bpp);
-                interp_config_set_mask(&c, maskLSB, maskMSB);
+                interpConfigSetMask(&c, maskLSB, maskMSB);
                 interp_set_config(interp, 0, &c);
             }
             {
                 auto c = interp_default_config();
                 interp_config_set_shift(&c, crossInput ? bpp : 0);
-                interp_config_set_mask(&c, maskLSB + bits, maskMSB + bits);
+                interpConfigSetMask(&c, maskLSB + bits, maskMSB + bits);
                 if (crossInput)
                 {
                     interp_config_set_cross_input(&c, true);
