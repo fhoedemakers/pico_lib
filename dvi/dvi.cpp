@@ -146,6 +146,35 @@ namespace dvi
                 lineCounter_ >= (timing_->vActiveLines - blankSettings_.bottom))
             {
                 blankLine = true;
+
+                // Retire whatever came due on this line even though the line is
+                // blanked, rather than leaving it queued forever.
+                //
+                // The blank margins are changed at runtime: every menu sets them
+                // to zero while it is open, draws all SCREENHEIGHT lines, and
+                // restores them on exit. Buffers already queued for lines that
+                // the restore puts back inside a margin were never consumed --
+                // the branch below is the only place that touches the queue, and
+                // it does not run for a blank line. freeTMDSQueue_ then drained,
+                // core1 blocked in convertScanBuffer12bpp()'s
+                // freeTMDSQueue_.deque(), validLineQueue_ filled behind it and
+                // the producer blocked in getLineBuffer() forever, with the
+                // display stuck on listActiveError_ (red). Deeper line pools
+                // widen the window, because more stale menu lines survive the
+                // transition, but the stranding itself is margin-driven.
+                if (curTMDSBuffer_)
+                {
+                    // Straddled the boundary mid-source-line. Release through
+                    // the deferred slot: the DMA may still be reading it.
+                    releaseTMDSBuffer_[0] = curTMDSBuffer_;
+                    curTMDSBuffer_ = nullptr;
+                }
+                else if (validTMDSQueue_.size() &&
+                         validTMDSQueue_.peek().line * 2 == lineCounter_)
+                {
+                    // Never handed to the DMA, so it can go straight back.
+                    freeTMDSQueue_.enque(validTMDSQueue_.deque().buffer);
+                }
             }
             else
             {
