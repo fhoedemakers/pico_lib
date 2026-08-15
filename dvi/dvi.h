@@ -95,19 +95,45 @@ namespace dvi
         using ResultTMDSBuffer = ResultBuffer<TMDSBuffer *>;
         using ResultLineBuffer = ResultBuffer<LineBuffer *>;
 
+        // Depth of the line-buffer pool, i.e. how many scanlines the producer
+        // may run ahead of scanout.
+        //
+        // This bounds the producer's tolerance for being slower per line than
+        // the display consumes. A source line is scanned out every
+        // 2 * (1/31500) = 63.5us at 640x480p60. A producer needing more than
+        // that per line falls behind by the difference on every line and
+        // starves once its lead is spent -- and dmaIRQHandler() only accepts a
+        // buffer on an exact `line * 2 == lineCounter_` match, so one miss
+        // orphans the rest of the frame (red lines) and costs a whole display
+        // frame. Five buffers is only ~318us of lead: fine for a producer that
+        // is faster per line than scanout, useless for one that is marginally
+        // slower, which is why the failure is abrupt rather than gradual.
+        //
+        // Only the line pool needs to grow. Core1 drains it into TMDS buffers
+        // as fast as it can and then blocks on the (small) free TMDS pool, so
+        // the producer's lead simply accumulates as queued line buffers.
+        // Each costs hActivePixels * sizeof(PixelType) = 1280 bytes at 640 wide.
+        //
+        // Default stays at 5 so other users of this library are unaffected;
+        // override with -DDVI_N_LINE_BUFFERS=n.
+#ifndef DVI_N_LINE_BUFFERS
+#define DVI_N_LINE_BUFFERS 5
+#endif
         static inline constexpr size_t N_BUFFERS = 5;
+        static inline constexpr size_t N_LINE_BUFFERS = DVI_N_LINE_BUFFERS;
+        static_assert(N_LINE_BUFFERS >= 2, "need at least a producer/consumer pair");
         static inline constexpr size_t N_COLOR_CH = 3;
 
         TMDSBuffer tmdsBuffers_[N_BUFFERS];
-        LineBuffer lineBuffers_[N_BUFFERS];
+        LineBuffer lineBuffers_[N_LINE_BUFFERS];
 
         util::Queue<ResultTMDSBuffer> validTMDSQueue_{N_BUFFERS};
         util::Queue<TMDSBuffer *> freeTMDSQueue_{N_BUFFERS};
         TMDSBuffer *curTMDSBuffer_{};
         TMDSBuffer *releaseTMDSBuffer_[2]{};
 
-        util::Queue<ResultLineBuffer> validLineQueue_{N_BUFFERS};
-        util::Queue<LineBuffer *> freeLineQueue_{N_BUFFERS};
+        util::Queue<ResultLineBuffer> validLineQueue_{N_LINE_BUFFERS};
+        util::Queue<LineBuffer *> freeLineQueue_{N_LINE_BUFFERS};
 
         DataPacket aviInfoFrame_;
         DataPacket audioClockRegeneration_;
