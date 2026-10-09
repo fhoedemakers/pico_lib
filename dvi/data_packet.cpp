@@ -215,12 +215,12 @@ namespace dvi
     void
     DataPacket::dump() const
     {
-        printf("HB: %02x %02x %02x:%02x\n", header[0], header[1], header[2], header[3]);
+        DVI_DUMP("HB: %02x %02x %02x:%02x\n", header[0], header[1], header[2], header[3]);
         for (int i = 0; i < 4; ++i)
         {
-            printf("SP%d: %02x %02x %02x %02x %02x %02x %02x:%02x\n", i,
-                   subPacket[i][0], subPacket[i][1], subPacket[i][2], subPacket[i][3],
-                   subPacket[i][4], subPacket[i][5], subPacket[i][6], subPacket[i][7]);
+            DVI_DUMP("SP%d: %02x %02x %02x %02x %02x %02x %02x:%02x\n", i,
+                     subPacket[i][0], subPacket[i][1], subPacket[i][2], subPacket[i][3],
+                     subPacket[i][4], subPacket[i][5], subPacket[i][6], subPacket[i][7]);
         }
     }
 
